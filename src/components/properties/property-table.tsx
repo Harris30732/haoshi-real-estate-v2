@@ -34,6 +34,7 @@ import {
 import { PROPERTY_STATUS, CONTRACT_TYPES, ITEMS_PER_PAGE } from '@/lib/constants'
 import { cn } from '@/lib/utils'
 import { useCompare } from '@/hooks/use-compare'
+import { useRouter } from 'next/navigation'
 
 interface PropertyTableProps {
   data: Property[]
@@ -197,6 +198,7 @@ const columns: ColumnDef<Property>[] = [
 export function PropertyTable({ data, onEdit, onDelete }: PropertyTableProps) {
   const [sorting, setSorting] = useState<SortingState>([])
   const { toggle, isSelected } = useCompare()
+  const router = useRouter()
 
   const table = useReactTable({
     data,
@@ -235,7 +237,7 @@ export function PropertyTable({ data, onEdit, onDelete }: PropertyTableProps) {
               </TableRow>
             ) : (
               table.getRowModel().rows.map((row) => (
-                <TableRow key={row.id} className="text-sm">
+                <TableRow key={row.id} className="text-sm cursor-pointer hover:bg-muted/50" onClick={() => router.push(`/properties/${row.original.id}`)}>
                   {row.getVisibleCells().map((cell) => (
                     <TableCell key={cell.id} className="py-2 whitespace-nowrap">
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}

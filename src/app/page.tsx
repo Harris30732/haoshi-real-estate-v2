@@ -3,15 +3,33 @@
 import { AppShell } from '@/components/layout/app-shell'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Home, Building2, FileText, TrendingUp } from 'lucide-react'
-
-const stats = [
-  { label: '物件總數', value: '—', icon: Home, color: 'text-blue-600' },
-  { label: '社區數量', value: '—', icon: Building2, color: 'text-purple-600' },
-  { label: '謄本資料', value: '13,046', icon: FileText, color: 'text-green-600' },
-  { label: '平均單價', value: '—', icon: TrendingUp, color: 'text-orange-600' },
-]
+import { useProperties } from '@/hooks/use-properties'
+import { useTranscriptStats } from '@/hooks/use-transcripts'
+import { PriceDistributionChart } from '@/components/charts/price-distribution'
+import { CommunityComparisonChart } from '@/components/charts/community-chart'
+import { PROPERTY_STATUS } from '@/lib/constants'
 
 export default function DashboardPage() {
+  const { data } = useProperties()
+  const { data: transcriptStats } = useTranscriptStats()
+
+  const properties = data?.properties || []
+  const communities = data?.communities || []
+  const activeProperties = properties.filter(
+    (p) => p.status !== PROPERTY_STATUS.DELISTED && p.status !== PROPERTY_STATUS.SOLD
+  )
+
+  const avgUnitPrice = activeProperties.length > 0
+    ? (activeProperties.reduce((s, p) => s + (p.unit_price || 0), 0) / activeProperties.length).toFixed(1)
+    : '—'
+
+  const stats = [
+    { label: '物件總數', value: activeProperties.length.toString(), icon: Home, color: 'text-blue-600' },
+    { label: '社區數量', value: communities.length.toString(), icon: Building2, color: 'text-purple-600' },
+    { label: '謄本資料', value: transcriptStats?.total?.toLocaleString() || '—', icon: FileText, color: 'text-green-600' },
+    { label: '平均單價', value: avgUnitPrice === '—' ? '—' : `${avgUnitPrice} 萬`, icon: TrendingUp, color: 'text-orange-600' },
+  ]
+
   return (
     <AppShell title="儀表板">
       {/* KPI Cards */}
@@ -31,24 +49,10 @@ export default function DashboardPage() {
         ))}
       </div>
 
-      {/* Chart Placeholder */}
+      {/* Charts */}
       <div className="mt-6 grid gap-4 lg:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">價格分布</CardTitle>
-          </CardHeader>
-          <CardContent className="h-64 flex items-center justify-center text-muted-foreground">
-            圖表將在 Phase 2 實作
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">社區比較</CardTitle>
-          </CardHeader>
-          <CardContent className="h-64 flex items-center justify-center text-muted-foreground">
-            圖表將在 Phase 2 實作
-          </CardContent>
-        </Card>
+        <PriceDistributionChart properties={activeProperties} />
+        <CommunityComparisonChart properties={activeProperties} />
       </div>
     </AppShell>
   )

@@ -3,7 +3,8 @@
 import { AppShell } from '@/components/layout/app-shell'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Plus, LayoutGrid, List, Loader2, BarChart3 } from 'lucide-react'
+import { Plus, LayoutGrid, List, Loader2, BarChart3, Download, Upload } from 'lucide-react'
+import { exportPropertiesCSV } from '@/lib/import-export'
 import { useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { useProperties, useCreateProperty, useUpdateProperty, useDeleteProperty } from '@/hooks/use-properties'
@@ -117,6 +118,10 @@ export default function PropertiesPage() {
               <LayoutGrid className="h-4 w-4" />
             </Button>
           </div>
+          <Button variant="outline" size="sm" onClick={() => exportPropertiesCSV(filtered)}>
+            <Download className="h-4 w-4 mr-1" />
+            匯出
+          </Button>
           <Button size="sm" onClick={handleAdd}>
             <Plus className="h-4 w-4 mr-1" />
             新增物件
