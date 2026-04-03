@@ -1,36 +1,43 @@
 'use client'
 
 import { AppShell } from '@/components/layout/app-shell'
-import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Plus, LayoutGrid, List, Loader2 } from 'lucide-react'
+import { Plus, LayoutGrid, List, Loader2, BarChart3 } from 'lucide-react'
 import { useState } from 'react'
 import { useProperties } from '@/hooks/use-properties'
+import { useFilteredProperties } from '@/hooks/use-filtered-properties'
 import { PropertyTable } from '@/components/properties/property-table'
 import { PropertyCard } from '@/components/properties/property-card'
+import { PropertyFilters } from '@/components/properties/property-filters'
+import { PriceDistributionChart } from '@/components/charts/price-distribution'
+import { AreaDistributionChart } from '@/components/charts/area-distribution'
+import { CommunityComparisonChart } from '@/components/charts/community-chart'
+import { PriceVsAreaChart } from '@/components/charts/price-vs-area'
 import { Property } from '@/types/property'
 import { PROPERTY_STATUS } from '@/lib/constants'
 
 export default function PropertiesPage() {
   const [viewMode, setViewMode] = useState<'table' | 'card'>('table')
   const [tab, setTab] = useState<'active' | 'archived'>('active')
+  const [showCharts, setShowCharts] = useState(false)
   const { data, isLoading, error } = useProperties()
 
   const properties = data?.properties || []
-  const filtered = properties.filter((p) =>
+  const tabFiltered = properties.filter((p) =>
     tab === 'active'
       ? p.status !== PROPERTY_STATUS.DELISTED && p.status !== PROPERTY_STATUS.SOLD
       : p.status === PROPERTY_STATUS.DELISTED || p.status === PROPERTY_STATUS.SOLD
   )
 
+  // Apply range/select filters on top of tab filter
+  const { filtered, dataLimits } = useFilteredProperties(tabFiltered)
+
   const handleEdit = (property: Property) => {
-    // TODO: Open edit drawer/modal
     console.log('Edit:', property.id)
   }
 
   const handleDelete = (id: string) => {
-    // TODO: Confirm dialog + delete
     console.log('Delete:', id)
   }
 
@@ -42,17 +49,23 @@ export default function PropertiesPage() {
           <TabsList>
             <TabsTrigger value="active">
               在售物件
-              {properties.filter(p => p.status !== PROPERTY_STATUS.DELISTED && p.status !== PROPERTY_STATUS.SOLD).length > 0 && (
-                <span className="ml-1.5 text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded-full">
-                  {properties.filter(p => p.status !== PROPERTY_STATUS.DELISTED && p.status !== PROPERTY_STATUS.SOLD).length}
-                </span>
-              )}
+              <span className="ml-1.5 text-xs opacity-70">
+                {filtered.length}
+              </span>
             </TabsTrigger>
             <TabsTrigger value="archived">已下架/成交</TabsTrigger>
           </TabsList>
         </Tabs>
 
         <div className="flex items-center gap-2">
+          <Button
+            variant={showCharts ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setShowCharts(!showCharts)}
+          >
+            <BarChart3 className="h-4 w-4 mr-1" />
+            圖表
+          </Button>
           <div className="flex border rounded-md">
             <Button
               variant={viewMode === 'table' ? 'default' : 'ghost'}
@@ -78,14 +91,20 @@ export default function PropertiesPage() {
         </div>
       </div>
 
-      {/* Filter placeholder */}
-      <Card className="mb-4">
-        <CardContent className="py-3">
-          <p className="text-sm text-muted-foreground">
-            篩選器（雙邊滑軌）— Phase 2 實作
-          </p>
-        </CardContent>
-      </Card>
+      {/* Filters */}
+      <div className="mb-4">
+        <PropertyFilters allProperties={tabFiltered} dataLimits={dataLimits} />
+      </div>
+
+      {/* Charts — uses filtered data, updates with filters */}
+      {showCharts && (
+        <div className="grid gap-4 sm:grid-cols-2 mb-4">
+          <PriceDistributionChart properties={filtered} />
+          <AreaDistributionChart properties={filtered} />
+          <CommunityComparisonChart properties={filtered} />
+          <PriceVsAreaChart properties={filtered} />
+        </div>
+      )}
 
       {/* Content */}
       {isLoading ? (
@@ -94,11 +113,9 @@ export default function PropertiesPage() {
           <span className="ml-2 text-muted-foreground">載入中...</span>
         </div>
       ) : error ? (
-        <Card>
-          <CardContent className="py-10 text-center text-destructive">
-            載入失敗：{(error as Error).message}
-          </CardContent>
-        </Card>
+        <div className="py-10 text-center text-destructive">
+          載入失敗：{(error as Error).message}
+        </div>
       ) : viewMode === 'table' ? (
         <PropertyTable data={filtered} onEdit={handleEdit} onDelete={handleDelete} />
       ) : (
