@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Plus, LayoutGrid, List, Loader2, BarChart3 } from 'lucide-react'
 import { useState, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import { useProperties, useCreateProperty, useUpdateProperty, useDeleteProperty } from '@/hooks/use-properties'
 import { useFilteredProperties } from '@/hooks/use-filtered-properties'
 import { PropertyTable } from '@/components/properties/property-table'
@@ -18,6 +19,8 @@ import { CommunityComparisonChart } from '@/components/charts/community-chart'
 import { PriceVsAreaChart } from '@/components/charts/price-vs-area'
 import { Property, PropertyFormData } from '@/types/property'
 import { PROPERTY_STATUS } from '@/lib/constants'
+import { useCompare } from '@/hooks/use-compare'
+import { Scale } from 'lucide-react'
 
 export default function PropertiesPage() {
   const [viewMode, setViewMode] = useState<'table' | 'card'>('table')
@@ -29,7 +32,9 @@ export default function PropertiesPage() {
   const [editingProperty, setEditingProperty] = useState<Property | null>(null)
   const [deleteId, setDeleteId] = useState<string | null>(null)
 
+  const router = useRouter()
   const { data, isLoading, error } = useProperties()
+  const { selectedIds } = useCompare()
   const createMutation = useCreateProperty()
   const updateMutation = useUpdateProperty()
   const deleteMutation = useDeleteProperty()
@@ -155,6 +160,16 @@ export default function PropertiesPage() {
               <PropertyCard key={p.id} property={p} onEdit={handleEdit} onDelete={handleDelete} />
             ))
           )}
+        </div>
+      )}
+
+      {/* Floating Compare Button */}
+      {selectedIds.length >= 2 && (
+        <div className="fixed bottom-6 right-6 z-50">
+          <Button size="lg" className="shadow-lg" onClick={() => router.push('/properties/compare')}>
+            <Scale className="h-4 w-4 mr-2" />
+            比較 {selectedIds.length} 個物件
+          </Button>
         </div>
       )}
 

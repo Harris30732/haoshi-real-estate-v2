@@ -22,6 +22,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { Checkbox } from '@/components/ui/checkbox'
 import {
   ArrowUpDown,
   ChevronLeft,
@@ -32,6 +33,7 @@ import {
 } from 'lucide-react'
 import { PROPERTY_STATUS, CONTRACT_TYPES, ITEMS_PER_PAGE } from '@/lib/constants'
 import { cn } from '@/lib/utils'
+import { useCompare } from '@/hooks/use-compare'
 
 interface PropertyTableProps {
   data: Property[]
@@ -53,6 +55,20 @@ const statusColor: Record<string, string> = {
 }
 
 const columns: ColumnDef<Property>[] = [
+  {
+    id: 'compare',
+    header: '比較',
+    cell: ({ row, table }) => {
+      const meta = table.options.meta as { onToggleCompare?: (id: string) => void; isCompared?: (id: string) => boolean }
+      const checked = meta?.isCompared?.(row.original.id) || false
+      return (
+        <Checkbox
+          checked={checked}
+          onCheckedChange={() => meta?.onToggleCompare?.(row.original.id)}
+        />
+      )
+    },
+  },
   {
     accessorKey: 'community_name',
     header: ({ column }) => (
@@ -180,6 +196,7 @@ const columns: ColumnDef<Property>[] = [
 
 export function PropertyTable({ data, onEdit, onDelete }: PropertyTableProps) {
   const [sorting, setSorting] = useState<SortingState>([])
+  const { toggle, isSelected } = useCompare()
 
   const table = useReactTable({
     data,
@@ -191,7 +208,7 @@ export function PropertyTable({ data, onEdit, onDelete }: PropertyTableProps) {
     getPaginationRowModel: getPaginationRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
     initialState: { pagination: { pageSize: ITEMS_PER_PAGE } },
-    meta: { onEdit, onDelete },
+    meta: { onEdit, onDelete, onToggleCompare: toggle, isCompared: isSelected },
   })
 
   return (
