@@ -12,6 +12,9 @@ import {
   Users,
   ClipboardList,
   Store,
+  FileSearch,
+  ListChecks,
+  KeyRound,
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react'
@@ -34,6 +37,8 @@ interface NavItem {
   permission?: string
   /** 僅 Owner 可見。 */
   ownerOnly?: boolean
+  /** active 判定用精確比對（href 為其他項目的前綴時需設此旗標）。 */
+  exact?: boolean
 }
 
 const mainNav: NavItem[] = [
@@ -41,12 +46,15 @@ const mainNav: NavItem[] = [
   { href: '/properties', label: '物件管理', icon: Home },
   { href: '/communities', label: '社區管理', icon: Building2, permission: PERMISSIONS.COMMUNITIES_VIEW },
   { href: '/transcripts', label: '謄本資料', icon: FileText, permission: PERMISSIONS.TRANSCRIPTS_VIEW },
+  { href: '/scrape', label: '謄本爬取', icon: FileSearch, permission: PERMISSIONS.SCRAPE_SUBMIT, exact: true },
+  { href: '/scrape/status', label: '爬取進度', icon: ListChecks, permission: PERMISSIONS.SCRAPE_SUBMIT },
   { href: '/analytics', label: '數據分析', icon: BarChart3 },
 ]
 
 const adminNav: NavItem[] = [
   { href: '/admin/registrations', label: '待審核申請', icon: ClipboardList, permission: PERMISSIONS.STORE_MANAGE_MEMBERS },
   { href: '/admin/members', label: '成員管理', icon: Users, permission: PERMISSIONS.STORE_MANAGE_MEMBERS },
+  { href: '/admin/store-credentials', label: 'YCUT 帳號設定', icon: KeyRound, permission: PERMISSIONS.STORE_MANAGE_CREDENTIALS },
   { href: '/admin/stores', label: '店別管理', icon: Store, ownerOnly: true },
 ]
 
@@ -69,7 +77,9 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
 
   const renderItem = (item: NavItem) => {
     const isActive =
-      item.href === '/' ? pathname === '/' : pathname.startsWith(item.href)
+      item.href === '/' || item.exact
+        ? pathname === item.href
+        : pathname.startsWith(item.href)
     return (
       <Link
         key={item.href}

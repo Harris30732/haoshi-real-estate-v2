@@ -13,9 +13,11 @@ interface AppShellProps {
   title?: string
   /** 頁面最低角色門檻，透傳給 AuthGuard 做 gating。 */
   requiredRole?: Role
+  /** 頁面最低功能權限門檻，透傳給 AuthGuard 做 gating。 */
+  requiredPermission?: string
 }
 
-export function AppShell({ children, title, requiredRole }: AppShellProps) {
+export function AppShell({ children, title, requiredRole, requiredPermission }: AppShellProps) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
 
@@ -32,7 +34,7 @@ export function AppShell({ children, title, requiredRole }: AppShellProps) {
   }, [])
 
   return (
-    <AuthGuard requiredRole={requiredRole}>
+    <AuthGuard requiredRole={requiredRole} requiredPermission={requiredPermission}>
     <div className="min-h-screen bg-background">
       {/* Desktop sidebar */}
       <div className="hidden md:block">

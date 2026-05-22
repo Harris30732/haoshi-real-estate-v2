@@ -1,4 +1,5 @@
 import type { Role, AccountStatus } from '@/types/user'
+import type { ScrapeRequestStatus, ScrapeRunStatus } from '@/types/scrape'
 
 export const APP_NAME = '好市房產'
 
@@ -69,6 +70,43 @@ export const PROFILE_STATUS = {
 export const PROFILE_STATUS_LABELS: Record<AccountStatus, string> = {
   active: '啟用',
   suspended: '停用',
+}
+
+// ==================== 謄本爬取狀態 ====================
+// 鍵值對齊 P0 schema 各表 CHECK 約束（20260522100003_community_scraping.sql）。
+
+export const SCRAPE_REQUEST_STATUS = {
+  QUEUED: 'queued',
+  WAITING: 'waiting',
+  FULFILLED: 'fulfilled',
+  DEDUPED: 'deduped',
+  FAILED: 'failed',
+} as const
+
+export const SCRAPE_REQUEST_STATUS_LABELS: Record<ScrapeRequestStatus, string> = {
+  queued: '排隊中',
+  waiting: '爬取中',
+  fulfilled: '完成',
+  deduped: '已共享',
+  failed: '失敗',
+}
+
+export const SCRAPE_RUN_STATUS = {
+  PENDING: 'pending',
+  SCANNING: 'scanning',
+  SCRAPING: 'scraping',
+  PASSED: 'passed',
+  INCOMPLETE: 'incomplete',
+  FAILED: 'failed',
+} as const
+
+export const SCRAPE_RUN_STATUS_LABELS: Record<ScrapeRunStatus, string> = {
+  pending: '等待認領',
+  scanning: '盤面掃描中',
+  scraping: '抓取中',
+  passed: '完成',
+  incomplete: '部分完成',
+  failed: '失敗',
 }
 
 export const PRICE_RANGES = [

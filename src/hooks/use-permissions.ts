@@ -123,3 +123,15 @@ export function useMyPermissions(): Set<string> {
     return set
   }, [profile, catalog, rolePerms, grants])
 }
+
+/**
+ * `useMyPermissions` 的就緒旗標 —— 三個底層權限 query 是否都已載入。
+ * AuthGuard 的 requiredPermission gating 用它，避免「載入中誤判無權限」的閃爍。
+ */
+export function useMyPermissionsReady(): boolean {
+  const profile = useAuth((s) => s.profile)
+  const catalog = usePermissions()
+  const rolePerms = useRolePermissions()
+  const grants = useProfilePermissionGrants(profile?.id ?? null)
+  return !catalog.isLoading && !rolePerms.isLoading && !grants.isLoading
+}
