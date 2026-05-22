@@ -1,3 +1,5 @@
+import type { Role, AccountStatus } from '@/types/user'
+
 export const APP_NAME = '好市房產'
 
 export const API_BASE = '/api'
@@ -6,10 +8,7 @@ export const ENDPOINTS = {
   ALL_DATA: '/all-data',
   PROPERTIES: '/admin/properties',
   COMMUNITIES: '/admin/communities',
-  USERS: '/admin/users',
   PHOTOS: '/admin/photos/upload',
-  AUTH_GOOGLE: '/auth/google',
-  AUTH_VERIFY: '/auth/verify',
 } as const
 
 export const PROPERTY_STATUS = {
@@ -29,16 +28,47 @@ export const LAYOUT_TYPES = [
   '套房', '兩房', '三房', '三房+1房', '四房', '四房以上',
 ] as const
 
-export const USER_ROLES = {
-  USER: 'user',
+// ==================== 多租戶角色 / 權限 / 狀態 ====================
+// 鍵值對齊 P0 schema seed（supabase/migrations/20260522100007_seed.sql）。
+
+export const ROLES = {
+  OWNER: 'owner',
   MANAGER: 'manager',
-  ADMIN: 'admin',
+  EMPLOYEE: 'employee',
 } as const
 
-export const ROLE_LABELS: Record<string, string> = {
-  user: '一般使用者',
-  manager: '管理者',
-  admin: '系統管理員',
+export const ROLE_LABELS: Record<Role, string> = {
+  owner: '系統擁有者',
+  manager: '店長',
+  employee: '員工',
+}
+
+export const PERMISSIONS = {
+  SCRAPE_SUBMIT: 'scrape.submit',
+  TRANSCRIPTS_VIEW: 'transcripts.view',
+  COMMUNITIES_VIEW: 'communities.view',
+  STORE_MANAGE_MEMBERS: 'store.manage_members',
+  STORE_MANAGE_CREDENTIALS: 'store.manage_credentials',
+  BILLING_VIEW: 'billing.view',
+} as const
+
+export const PERMISSION_LABELS: Record<string, string> = {
+  'scrape.submit': '送出謄本爬取',
+  'transcripts.view': '瀏覽謄本資料',
+  'communities.view': '瀏覽社區',
+  'store.manage_members': '管理店內成員',
+  'store.manage_credentials': '設定店 YCUT 憑證',
+  'billing.view': '檢視計價與用量',
+}
+
+export const PROFILE_STATUS = {
+  ACTIVE: 'active',
+  SUSPENDED: 'suspended',
+} as const
+
+export const PROFILE_STATUS_LABELS: Record<AccountStatus, string> = {
+  active: '啟用',
+  suspended: '停用',
 }
 
 export const PRICE_RANGES = [

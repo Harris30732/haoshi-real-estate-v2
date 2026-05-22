@@ -3,20 +3,32 @@
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/hooks/use-auth'
+import type { Role } from '@/types/user'
 
-export function AuthGuard({ children }: { children: React.ReactNode }) {
+/** 角色高低（數字越小權限越高）。owner > manager > employee。 */
+const ROLE_RANK: Record<Role, number> = { owner: 0, manager: 1, employee: 2 }
+
+interface AuthGuardProps {
+  children: React.ReactNode
+  /** 最低角色門檻：未達門檻者顯示「無權限」畫面。未指定則任何 active 使用者皆可進。 */
+  requiredRole?: Role
+}
+
+/**
+ * 受保護頁面的守門元件。安全邊界靠 P0 RLS；此處只做導向與 UX gating。
+ * 依 Supabase session 推導的 authState 導向：
+ *   anon → /login、pending → /register、suspended → /login（登入頁顯示停用提示）。
+ */
+export function AuthGuard({ children, requiredRole }: AuthGuardProps) {
   const router = useRouter()
-  const { isAuthenticated, isLoading, checkAuth } = useAuth()
+  const { authState, profile, isLoading } = useAuth()
 
   useEffect(() => {
-    checkAuth()
-  }, [checkAuth])
-
-  useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      router.push('/login')
-    }
-  }, [isLoading, isAuthenticated, router])
+    if (isLoading) return
+    if (authState === 'anon') router.replace('/login')
+    else if (authState === 'pending') router.replace('/register')
+    else if (authState === 'suspended') router.replace('/login')
+  }, [authState, isLoading, router])
 
   if (isLoading) {
     return (
@@ -29,7 +41,20 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
     )
   }
 
-  if (!isAuthenticated) return null
+  // 非 active：導向 effect 已觸發，此處不渲染內容。
+  if (authState !== 'active' || !profile) return null
+
+  // 角色 gating：使用者角色權限低於頁面要求 → 無權限畫面。
+  if (requiredRole && ROLE_RANK[profile.role_key] > ROLE_RANK[requiredRole]) {
+    return (
+      <div className="flex min-h-screen items-center justify-center p-4">
+        <div className="text-center">
+          <p className="text-lg font-semibold">無存取權限</p>
+          <p className="mt-1 text-sm text-muted-foreground">此頁面僅限特定角色存取，請聯絡店長。</p>
+        </div>
+      </div>
+    )
+  }
 
   return <>{children}</>
 }

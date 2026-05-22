@@ -6,13 +6,16 @@ import { Sidebar } from './sidebar'
 import { Header } from './header'
 import { AuthGuard } from './auth-guard'
 import { Sheet, SheetContent } from '@/components/ui/sheet'
+import type { Role } from '@/types/user'
 
 interface AppShellProps {
   children: React.ReactNode
   title?: string
+  /** 頁面最低角色門檻，透傳給 AuthGuard 做 gating。 */
+  requiredRole?: Role
 }
 
-export function AppShell({ children, title }: AppShellProps) {
+export function AppShell({ children, title, requiredRole }: AppShellProps) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
 
@@ -29,7 +32,7 @@ export function AppShell({ children, title }: AppShellProps) {
   }, [])
 
   return (
-    <AuthGuard>
+    <AuthGuard requiredRole={requiredRole}>
     <div className="min-h-screen bg-background">
       {/* Desktop sidebar */}
       <div className="hidden md:block">
