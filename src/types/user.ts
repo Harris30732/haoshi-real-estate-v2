@@ -47,14 +47,20 @@ export interface Permission {
   group_name: string
 }
 
-/** 註冊申請。對應 public.registration_requests。 */
+/**
+ * 註冊申請。對應 public.registration_requests。
+ * 2026-05-27 升級：store_id 改 nullable；新增 proposed_store_* 讓申請人提案新店，admin approve 時可建立成正式 stores。
+ */
 export interface RegistrationRequest {
   id: string
   auth_user_id: string
   email: string
   full_name: string
   phone_ext: string | null
-  store_id: string
+  store_id: string | null
+  proposed_store_name: string | null
+  proposed_store_code: string | null
+  proposed_store_region: string | null
   status: RegistrationStatus
   reviewed_by: string | null
   reviewed_at: string | null

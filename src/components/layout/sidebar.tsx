@@ -12,8 +12,6 @@ import {
   Users,
   ClipboardList,
   Store,
-  FileSearch,
-  ListChecks,
   KeyRound,
   ChevronLeft,
   ChevronRight,
@@ -46,8 +44,6 @@ const mainNav: NavItem[] = [
   { href: '/properties', label: '物件管理', icon: Home },
   { href: '/communities', label: '社區管理', icon: Building2, permission: PERMISSIONS.COMMUNITIES_VIEW },
   { href: '/transcripts', label: '謄本資料', icon: FileText, permission: PERMISSIONS.TRANSCRIPTS_VIEW },
-  { href: '/scrape', label: '謄本爬取', icon: FileSearch, permission: PERMISSIONS.SCRAPE_SUBMIT, exact: true },
-  { href: '/scrape/status', label: '爬取進度', icon: ListChecks, permission: PERMISSIONS.SCRAPE_SUBMIT },
   { href: '/analytics', label: '數據分析', icon: BarChart3 },
 ]
 

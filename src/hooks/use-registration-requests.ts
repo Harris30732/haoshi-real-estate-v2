@@ -44,23 +44,42 @@ export function useMyRegistrationRequest() {
   })
 }
 
-/** 送出註冊申請（RLS：auth_user_id 必須等於 auth.uid()）。 */
+/**
+ * 送出註冊申請。兩種模式：
+ *   (a) existing-store：傳 storeId（從下拉選擇既有店）
+ *   (b) new-store：傳 proposedStoreName / proposedStoreCode（自填新店資訊，admin 核准時可建立成正式店）
+ */
 export function useSubmitRegistration() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (input: {
-      storeId: string
+      storeId?: string | null
+      proposedStoreName?: string | null
+      proposedStoreCode?: string | null
+      proposedStoreRegion?: string | null
       fullName: string
       email: string
       phoneExt: string | null
     }) => {
       const authUserId = useAuth.getState().authUserId
       if (!authUserId) throw new Error('尚未登入，請先用 Google 登入')
+      const trimOrNull = (v?: string | null) => {
+        const t = (v ?? '').trim()
+        return t.length > 0 ? t : null
+      }
+      const storeId = input.storeId || null
+      const proposedName = trimOrNull(input.proposedStoreName)
+      if (!storeId && !proposedName) {
+        throw new Error('請選擇所屬店，或填寫新店資訊')
+      }
       const { data, error } = await supabase
         .from('registration_requests')
         .insert({
           auth_user_id: authUserId,
-          store_id: input.storeId,
+          store_id: storeId,
+          proposed_store_name: proposedName,
+          proposed_store_code: trimOrNull(input.proposedStoreCode),
+          proposed_store_region: trimOrNull(input.proposedStoreRegion),
           full_name: input.fullName,
           email: input.email,
           phone_ext: input.phoneExt,
@@ -73,26 +92,47 @@ export function useSubmitRegistration() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['my-registration-request'] })
-      toast.success('申請已送出，等待店長審核')
+      toast.success('申請已送出，等待審核')
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : '送出失敗'),
   })
 }
 
-/** 核准申請（呼叫 approve_registration RPC，DB 端會驗角色權限）。 */
+/**
+ * 核准申請 — 用 approve_registration_v2 RPC，DB 驗角色 + 三種模式：
+ *   (a) 直接套用申請人選的店（store_id, create_store_name 都不傳）
+ *   (b) admin 改派既有店（傳 storeId）
+ *   (c) admin 建立新店並指派（傳 createStoreName + code/region；僅 Owner 可）
+ */
 export function useApproveRegistration() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (v: { requestId: string; role: Role }) => {
-      const { error } = await supabase.rpc('approve_registration', {
+    mutationFn: async (v: {
+      requestId: string
+      role: Role
+      storeId?: string | null               // (b) override 既有店
+      createStoreName?: string | null       // (c) 建立新店
+      createStoreCode?: string | null
+      createStoreRegion?: string | null
+    }) => {
+      const trimOrNull = (s?: string | null) => {
+        const t = (s ?? '').trim()
+        return t.length > 0 ? t : null
+      }
+      const { error } = await supabase.rpc('approve_registration_v2', {
         p_request_id: v.requestId,
         p_role_key: v.role,
+        p_store_id: v.storeId || null,
+        p_create_store_name: trimOrNull(v.createStoreName),
+        p_create_store_code: trimOrNull(v.createStoreCode),
+        p_create_store_region: trimOrNull(v.createStoreRegion),
       })
       if (error) throw error
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['registration-requests'] })
       qc.invalidateQueries({ queryKey: ['store-members'] })
+      qc.invalidateQueries({ queryKey: ['stores'] })  // 新店建立後刷新店清單
       toast.success('已核准申請')
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : '核准失敗'),
