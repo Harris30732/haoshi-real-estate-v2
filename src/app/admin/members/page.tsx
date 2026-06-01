@@ -24,8 +24,11 @@ import { useAuth } from '@/hooks/use-auth'
 import { useStoreMembers } from '@/hooks/use-store-members'
 import { useStores } from '@/hooks/use-stores'
 import { useUpdateProfileStatus, useUpdateProfileRole } from '@/hooks/use-profile'
+import { useListInvites, useRevokeInvite } from '@/hooks/use-invites'
 import { MemberPermissionDialog } from '@/components/admin/member-permission-dialog'
+import { InviteMemberDialog } from '@/components/admin/invite-member-dialog'
 import { ROLE_LABELS, PROFILE_STATUS_LABELS } from '@/lib/constants'
+import { UserPlus } from 'lucide-react'
 import type { Profile, Role } from '@/types/user'
 
 export default function MembersPage() {
@@ -33,9 +36,12 @@ export default function MembersPage() {
   const isOwner = profile?.role_key === 'owner'
   const members = useStoreMembers()
   const stores = useStores()
+  const invites = useListInvites()
+  const revokeInvite = useRevokeInvite()
   const updateStatus = useUpdateProfileStatus()
   const updateRole = useUpdateProfileRole()
   const [permTarget, setPermTarget] = useState<Profile | null>(null)
+  const [inviteOpen, setInviteOpen] = useState(false)
 
   const storeName = (id: string | null) =>
     id ? (stores.data?.find((s) => s.id === id)?.name ?? id) : '—'
@@ -47,9 +53,61 @@ export default function MembersPage() {
     })
 
   const rows = members.data ?? []
+  const pendingInvites = invites.data ?? []
 
   return (
     <AppShell title="成員管理">
+      <div className="mb-4 flex items-center justify-between">
+        <p className="text-sm text-muted-foreground">
+          以 Email 邀請新成員，對方用該 Google 帳號登入即自動加入。
+        </p>
+        <Button onClick={() => setInviteOpen(true)}>
+          <UserPlus className="mr-2 h-4 w-4" />
+          邀請成員
+        </Button>
+      </div>
+
+      {pendingInvites.length > 0 && (
+        <Card className="mb-4">
+          <CardContent className="p-0">
+            <div className="border-b px-4 py-2 text-sm font-medium text-muted-foreground">
+              待接受邀請（{pendingInvites.length}）
+            </div>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Email</TableHead>
+                  <TableHead>姓名</TableHead>
+                  <TableHead>角色</TableHead>
+                  <TableHead>店別</TableHead>
+                  <TableHead className="text-right">操作</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {pendingInvites.map((inv) => (
+                  <TableRow key={inv.id}>
+                    <TableCell>{inv.email}</TableCell>
+                    <TableCell>{inv.full_name ?? '—'}</TableCell>
+                    <TableCell>{ROLE_LABELS[inv.role_key]}</TableCell>
+                    <TableCell>{inv.store_name}</TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => revokeInvite.mutate(inv.id)}
+                        disabled={revokeInvite.isPending}
+                      >
+                        撤銷
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
+
       <Card>
         <CardContent className="p-0">
           {members.isLoading ? (
@@ -132,6 +190,7 @@ export default function MembersPage() {
       </Card>
 
       <MemberPermissionDialog member={permTarget} onClose={() => setPermTarget(null)} />
+      <InviteMemberDialog open={inviteOpen} onClose={() => setInviteOpen(false)} />
     </AppShell>
   )
 }

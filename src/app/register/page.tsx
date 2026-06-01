@@ -3,36 +3,30 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/hooks/use-auth'
-import { useStoresForRegistration } from '@/hooks/use-stores'
-import { useMyRegistrationRequest, useSubmitRegistration } from '@/hooks/use-registration-requests'
+import { useMyInvite, useAcceptInvite } from '@/hooks/use-invites'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import toast from 'react-hot-toast'
+import { ROLE_LABELS } from '@/lib/constants'
 
 function FullScreen({ children }: { children: React.ReactNode }) {
-  return <div className="flex min-h-screen items-center justify-center p-4">{children}</div>
+  return <div className="flex min-h-screen items-center justify-center bg-muted/40 p-4">{children}</div>
 }
 
+/**
+ * 加入頁（P4-Auth：Email 預先邀請）。pending 使用者（已 Google 登入、尚無 profile）的入口：
+ * - 有 pending 邀請 → 顯示店名/角色，確認加入（可改顯示名）→ accept → refreshSession → 導首頁
+ * - 無邀請 → 死路「帳號尚未授權，請聯絡管理員」+ 登出
+ */
 export default function RegisterPage() {
   const router = useRouter()
-  const { authState, isLoading, authEmail, authName } = useAuth()
-  const myReq = useMyRegistrationRequest()
-  const stores = useStoresForRegistration()
-  const submit = useSubmitRegistration()
+  const { authState, isLoading, authEmail, authName, signOut } = useAuth()
+  const myInvite = useMyInvite()
+  const accept = useAcceptInvite()
 
-  const [mode, setMode] = useState<'existing' | 'new'>('existing')
-  const [storeId, setStoreId] = useState('')
-  const [proposedStoreName, setProposedStoreName] = useState('')
-  const [proposedStoreCode, setProposedStoreCode] = useState('')
-  const [proposedStoreRegion, setProposedStoreRegion] = useState('')
   const [editedName, setEditedName] = useState<string | null>(null)
-  const [phoneExt, setPhoneExt] = useState('')
-
-  // 姓名預填 Google 帶回的值；使用者一旦編輯即以編輯值為準（衍生狀態，免 effect）。
-  const fullName = editedName ?? authName ?? ''
+  const fullName = editedName ?? myInvite.data?.full_name ?? authName ?? ''
 
   // 非 pending 狀態導離：anon/suspended → 登入頁、active → 首頁。
   useEffect(() => {
@@ -41,12 +35,24 @@ export default function RegisterPage() {
     else if (authState === 'active') router.replace('/')
   }, [authState, isLoading, router])
 
-  // 已有待審申請 → 待審核頁。
-  useEffect(() => {
-    if (myReq.data?.status === 'pending') router.replace('/pending')
-  }, [myReq.data, router])
+  const handleSignOut = async () => {
+    await signOut()
+    router.replace('/login')
+  }
 
-  if (isLoading || authState !== 'pending' || myReq.isLoading || myReq.data?.status === 'pending') {
+  const handleAccept = async () => {
+    try {
+      await accept.mutateAsync({ fullName })
+      // accept 成功後 refreshSession 觸發 onAuthStateChange → syncProfile → active；
+      // 上方 effect 會在 authState 變 active 時導向首頁。保險起見也主動推一次。
+      router.replace('/')
+    } catch {
+      // useAcceptInvite 的 onError 已顯示 toast。
+    }
+  }
+
+  // 載入中（含 pending 但邀請查詢未回）顯示 spinner。
+  if (isLoading || authState !== 'pending' || myInvite.isLoading) {
     return (
       <FullScreen>
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
@@ -54,153 +60,78 @@ export default function RegisterPage() {
     )
   }
 
-  const canSubmit = (() => {
-    if (!fullName.trim() || !authEmail) return false
-    if (mode === 'existing') return !!storeId
-    return proposedStoreName.trim().length > 0
-  })()
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!canSubmit) return
-    if (!authEmail) {
-      toast.error('無法取得 Google 帳號 Email，請重新登入')
-      return
-    }
-    try {
-      await submit.mutateAsync({
-        storeId: mode === 'existing' ? storeId : null,
-        proposedStoreName: mode === 'new' ? proposedStoreName.trim() : null,
-        proposedStoreCode: mode === 'new' ? proposedStoreCode.trim() || null : null,
-        proposedStoreRegion: mode === 'new' ? proposedStoreRegion.trim() || null : null,
-        fullName: fullName.trim(),
-        email: authEmail,
-        phoneExt: phoneExt.trim() || null,
-      })
-      router.replace('/pending')
-    } catch {
-      // useSubmitRegistration 的 onError 已顯示 toast。
-    }
+  // 無邀請 → 死路。
+  if (!myInvite.data) {
+    return (
+      <FullScreen>
+        <Card className="w-full max-w-sm">
+          <CardHeader className="text-center">
+            <CardTitle className="text-xl">尚未開通</CardTitle>
+            <CardDescription>您的帳號尚未被授權加入系統</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="rounded-md bg-muted/50 px-3 py-2 text-sm">
+              <p className="text-muted-foreground">登入帳號</p>
+              <p className="break-all">{authEmail}</p>
+            </div>
+            <p className="text-center text-xs text-muted-foreground">
+              請將此 Email 提供給您的店長或系統管理員，由對方在後台發送邀請後，再用此 Google 帳號登入即可加入。
+            </p>
+            <Button variant="outline" className="w-full" onClick={handleSignOut}>
+              登出
+            </Button>
+          </CardContent>
+        </Card>
+      </FullScreen>
+    )
   }
 
+  // 有邀請 → 確認加入。
+  const inv = myInvite.data
   return (
     <FullScreen>
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <CardTitle className="text-xl">申請加入</CardTitle>
-          <CardDescription>填寫資料，送出後由系統管理員審核</CardDescription>
+          <CardTitle className="text-xl">確認加入</CardTitle>
+          <CardDescription>您已被邀請加入，請確認資料後加入系統</CardDescription>
         </CardHeader>
-        <CardContent>
-          <form className="space-y-4" onSubmit={handleSubmit}>
-            {/* Mode 切換：既有店 vs 新店申請 */}
-            <div className="flex gap-2 p-1 rounded-md bg-muted text-sm">
-              <button
-                type="button"
-                className={`flex-1 py-1.5 rounded ${mode === 'existing' ? 'bg-background shadow-sm font-medium' : 'text-muted-foreground'}`}
-                onClick={() => setMode('existing')}
-              >
-                我的店已在清單裡
-              </button>
-              <button
-                type="button"
-                className={`flex-1 py-1.5 rounded ${mode === 'new' ? 'bg-background shadow-sm font-medium' : 'text-muted-foreground'}`}
-                onClick={() => setMode('new')}
-              >
-                我們是新店
-              </button>
+        <CardContent className="space-y-4">
+          <div className="rounded-md border p-3 text-sm space-y-2">
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">所屬店別</span>
+              <span className="font-medium">{inv.store_name}</span>
             </div>
-
-            {mode === 'existing' ? (
-              <div className="space-y-1.5">
-                <Label htmlFor="store">所屬店別</Label>
-                <Select value={storeId} onValueChange={(v) => setStoreId(v ?? '')}>
-                  <SelectTrigger id="store" className="w-full">
-                    <SelectValue placeholder="選擇店別" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {(stores.data ?? []).map((s) => (
-                      <SelectItem key={s.id} value={s.id}>
-                        {s.name}（{s.code}）
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            ) : (
-              <div className="space-y-3 p-3 rounded-md border border-dashed">
-                <p className="text-xs text-muted-foreground">
-                  填寫貴店資訊，管理員審核時會建立成正式店。例：青埔國小新生加盟店 / BA119 / 永慶不動產。
-                </p>
-                <div className="space-y-1.5">
-                  <Label htmlFor="proposed-name">店名 *</Label>
-                  <Input
-                    id="proposed-name"
-                    value={proposedStoreName}
-                    onChange={(e) => setProposedStoreName(e.target.value)}
-                    placeholder="例：青埔國小新生加盟店"
-                    maxLength={80}
-                    required={mode === 'new'}
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="space-y-1.5">
-                    <Label htmlFor="proposed-code">店號（選填）</Label>
-                    <Input
-                      id="proposed-code"
-                      value={proposedStoreCode}
-                      onChange={(e) => setProposedStoreCode(e.target.value)}
-                      placeholder="例：BA119"
-                      maxLength={20}
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="proposed-region">地區（選填）</Label>
-                    <Input
-                      id="proposed-region"
-                      value={proposedStoreRegion}
-                      onChange={(e) => setProposedStoreRegion(e.target.value)}
-                      placeholder="例：桃園"
-                      maxLength={20}
-                    />
-                  </div>
-                </div>
-              </div>
-            )}
-
-            <div className="space-y-1.5">
-              <Label htmlFor="fullName">姓名</Label>
-              <Input
-                id="fullName"
-                value={fullName}
-                onChange={(e) => setEditedName(e.target.value)}
-                maxLength={50}
-                required
-              />
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">角色</span>
+              <span className="font-medium">{ROLE_LABELS[inv.role_key]}</span>
             </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="email">Email</Label>
-              <Input id="email" value={authEmail ?? ''} readOnly disabled />
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Email</span>
+              <span className="break-all">{authEmail}</span>
             </div>
+          </div>
 
-            <div className="space-y-1.5">
-              <Label htmlFor="phoneExt">分機（選填）</Label>
-              <Input
-                id="phoneExt"
-                value={phoneExt}
-                onChange={(e) => setPhoneExt(e.target.value)}
-                maxLength={20}
-              />
-            </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="fullName">您的姓名</Label>
+            <Input
+              id="fullName"
+              value={fullName}
+              onChange={(e) => setEditedName(e.target.value)}
+              maxLength={50}
+              placeholder="請輸入姓名"
+            />
+          </div>
 
-            <Button
-              type="submit"
-              className="w-full"
-              disabled={submit.isPending || !canSubmit}
-            >
-              {submit.isPending ? '送出中…' : '送出申請'}
-            </Button>
-          </form>
+          <Button
+            className="w-full"
+            onClick={handleAccept}
+            disabled={accept.isPending || !fullName.trim()}
+          >
+            {accept.isPending ? '加入中…' : '確認加入'}
+          </Button>
+          <Button variant="ghost" className="w-full" onClick={handleSignOut} disabled={accept.isPending}>
+            這不是我，登出
+          </Button>
         </CardContent>
       </Card>
     </FullScreen>

@@ -10,7 +10,6 @@ import {
   FileText,
   BarChart3,
   Users,
-  ClipboardList,
   Store,
   KeyRound,
   ChevronLeft,
@@ -48,7 +47,7 @@ const mainNav: NavItem[] = [
 ]
 
 const adminNav: NavItem[] = [
-  { href: '/admin/registrations', label: '待審核申請', icon: ClipboardList, permission: PERMISSIONS.STORE_MANAGE_MEMBERS },
+  // 成員管理頁承載「邀請成員」（Email 預先邀請）；舊「待審核申請」自助註冊流程已停用。
   { href: '/admin/members', label: '成員管理', icon: Users, permission: PERMISSIONS.STORE_MANAGE_MEMBERS },
   { href: '/admin/store-credentials', label: 'YCUT 帳號設定', icon: KeyRound, permission: PERMISSIONS.STORE_MANAGE_CREDENTIALS },
   { href: '/admin/stores', label: '店別管理', icon: Store, ownerOnly: true },

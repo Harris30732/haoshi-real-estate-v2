@@ -50,6 +50,7 @@ export interface Permission {
 /**
  * 註冊申請。對應 public.registration_requests。
  * 2026-05-27 升級：store_id 改 nullable；新增 proposed_store_* 讓申請人提案新店，admin approve 時可建立成正式 stores。
+ * 2026-06-01：自助註冊改為「Email 預先邀請」模式（見 Invite），此表保留為 legacy。
  */
 export interface RegistrationRequest {
   id: string
@@ -66,4 +67,33 @@ export interface RegistrationRequest {
   reviewed_at: string | null
   reject_reason: string | null
   created_at: string
+}
+
+/** 邀請狀態。對應 public.invites.status。 */
+export type InviteStatus = 'pending' | 'accepted' | 'revoked'
+
+/**
+ * Email 預先邀請（2026-06-01 P4-Auth）。對應 public.invites。
+ * Owner/店長發邀請（線下傳訊息拿對方 Google email），對方用該 Google 登入後
+ * 系統以已驗證 email 比對 invites 自動建 profile 入座。
+ * list_invites RPC 回傳含 store_name（JOIN stores）。
+ */
+export interface Invite {
+  id: string
+  email: string
+  full_name: string | null
+  store_id: string
+  store_name: string
+  role_key: Exclude<Role, 'owner'>
+  invited_by: string | null
+  created_at: string
+}
+
+/** get_my_invite RPC 回傳：當前登入者的 pending 邀請（給 /register 顯示）。 */
+export interface MyInvite {
+  invite_id: string
+  store_id: string
+  store_name: string
+  role_key: Exclude<Role, 'owner'>
+  full_name: string | null
 }
