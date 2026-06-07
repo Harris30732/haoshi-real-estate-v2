@@ -12,6 +12,7 @@ import {
   Users,
   Store,
   KeyRound,
+  Receipt,
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react'
@@ -51,6 +52,7 @@ const adminNav: NavItem[] = [
   { href: '/admin/members', label: '成員管理', icon: Users, permission: PERMISSIONS.STORE_MANAGE_MEMBERS },
   { href: '/admin/store-credentials', label: 'YCUT 帳號設定', icon: KeyRound, permission: PERMISSIONS.STORE_MANAGE_CREDENTIALS },
   { href: '/admin/stores', label: '店別管理', icon: Store, ownerOnly: true },
+  { href: '/admin/pricing', label: '計價帳務', icon: Receipt, ownerOnly: true },
 ]
 
 export function Sidebar({ collapsed, onToggle }: SidebarProps) {
