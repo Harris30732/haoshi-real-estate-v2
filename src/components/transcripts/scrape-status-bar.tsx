@@ -30,6 +30,20 @@ function isRecentAnomaly(req: ScrapeRequestWithRun): boolean {
   return Date.now() - new Date(ts).getTime() < ANOMALY_WINDOW_MS
 }
 
+/**
+ * 提報店可見：最近 24h 內因「查無社區」失敗的 run（YCUT 盤面搜不到此社區名）。
+ * 這類失敗代表名稱可能有誤 → 提示提報店重新確認名稱後重送；其餘失敗仍僅 Owner 可見。
+ * fail_reason 由 worker run-executor 在搜尋 0 筆時寫入字串「查無社區: <name>」。
+ * 注意：不含「找不到社區連結」（有搜到但點不進，屬技術性，名稱無誤）。
+ */
+function isRecentNotFound(req: ScrapeRequestWithRun): boolean {
+  const run = req.run
+  if (!run || run.status !== 'failed') return false
+  if (!run.fail_reason?.includes('查無社區')) return false
+  const ts = run.finished_at ?? run.updated_at ?? run.created_at
+  return Date.now() - new Date(ts).getTime() < ANOMALY_WINDOW_MS
+}
+
 function relativeTime(iso: string): string {
   const diffMs = Date.now() - new Date(iso).getTime()
   const min = Math.floor(diffMs / 60_000)
@@ -124,7 +138,7 @@ function ActiveRow({
  * 上方狀態欄：當前店「正在抓取」的社區跑條 + （Owner 限定）最近異常回報。
  * - 0 active 且無 Owner 異常 → 自動隱藏（return null）
  * - 進行中：每筆社區顯示階段（等待認領 → 盤點戶數 → 已解析 X/N 戶）+ 跑條
- * - 異常（失敗戶、incomplete/failed）只給 Owner 看；店長/員工看到的是乾淨進度
+ * - 異常（失敗戶、incomplete/failed）只給 Owner 看；唯「查無社區」失敗也給提報店看（提示重送）；其餘店長/員工看到乾淨進度
  * - 透過 15s（下單清單）+ 5s（逐戶進度）輪詢，跑完自動消失
  */
 export function ScrapeStatusBar() {
@@ -139,9 +153,11 @@ export function ScrapeStatusBar() {
   const { data: progressMap } = useScrapeRunProgress(activeRunIds)
 
   const anomalies = isOwner ? requests.filter(isRecentAnomaly) : []
+  // 非 Owner（店長/員工）：只看自家「查無社區」失敗，提示重新確認名稱後重送。
+  const notFound = isOwner ? [] : requests.filter(isRecentNotFound)
 
   if (isLoading) return null
-  if (active.length === 0 && anomalies.length === 0) return null
+  if (active.length === 0 && anomalies.length === 0 && notFound.length === 0) return null
 
   return (
     <Card className="border-primary/30 bg-primary/5">
@@ -201,6 +217,38 @@ export function ScrapeStatusBar() {
                         已收錄 {req.run.covered_count} / {req.run.displayed_count} 戶
                       </div>
                     )}
+                  </div>
+                  <span className="text-xs text-muted-foreground shrink-0">
+                    {relativeTime(req.run?.finished_at ?? req.run?.updated_at ?? req.created_at)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {notFound.length > 0 && (
+          <div className={active.length > 0 ? 'pt-2 border-t border-primary/20' : ''}>
+            <div className="flex items-center gap-2 text-sm font-medium text-amber-600 dark:text-amber-500">
+              <AlertTriangle className="h-4 w-4" />
+              <span>需要重新確認 ({notFound.length})</span>
+            </div>
+            <div className="space-y-1.5 mt-2">
+              {notFound.map((req) => (
+                <div key={req.id} className="flex items-start justify-between gap-2 text-sm">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium truncate">{req.community_name_input}</span>
+                      <Badge
+                        variant="outline"
+                        className="text-xs shrink-0 border-amber-500/50 text-amber-600 dark:text-amber-500"
+                      >
+                        查無社區
+                      </Badge>
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      永慶盤面查無此社區，請確認名稱正確後重新下單
+                    </div>
                   </div>
                   <span className="text-xs text-muted-foreground shrink-0">
                     {relativeTime(req.run?.finished_at ?? req.run?.updated_at ?? req.created_at)}
