@@ -2,6 +2,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
+import { useAuth } from '@/hooks/use-auth'
 import type { StoreCredentialStatus } from '@/types/scrape'
 import toast from 'react-hot-toast'
 
@@ -46,4 +47,18 @@ export function useSetStoreCredentials() {
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : '設定失敗'),
   })
+}
+
+/**
+ * 當前登入店長的店是否「尚未設定 YCUT 帳密」。
+ * 用於：(1) 全站提示彈窗 [[ycut-credential-gate]]、(2) 擋下單。
+ * 只針對店長（manager）—— Owner 走多店下拉設定、員工不設帳密，故不觸發。
+ * needs 僅在 RPC 明確回 configured=false 時為 true（loading/未知時不誤擋）。
+ */
+export function useNeedsYcutCredentials() {
+  const profile = useAuth((s) => s.profile)
+  const storeId = profile?.role_key === 'manager' ? (profile?.store_id ?? null) : null
+  const status = useStoreCredentialStatus(storeId)
+  const needs = !!storeId && status.data != null && !status.data.configured
+  return { needs, isLoading: status.isLoading, storeId }
 }

@@ -2,6 +2,8 @@
 
 import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
+import { useRouter } from 'next/navigation'
+import { KeyRound } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -14,6 +16,7 @@ import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import { useScrapeSubmit } from '@/hooks/use-scrape-submit'
+import { useNeedsYcutCredentials } from '@/hooks/use-store-credentials'
 import { SCRAPE_REQUEST_STATUS_LABELS } from '@/lib/constants'
 import type { ScrapeRequestStatus } from '@/types/scrape'
 
@@ -49,6 +52,9 @@ export function ImportDialog({ open, onOpenChange }: ImportDialogProps) {
   const [submitting, setSubmitting] = useState(false)
   const submit = useScrapeSubmit()
   const qc = useQueryClient()
+  const router = useRouter()
+  // 沒設定 YCUT 帳密就擋下單（避免又產生一堆憑證失敗的 run）。
+  const { needs: noCreds } = useNeedsYcutCredentials()
 
   const handleSubmit = async () => {
     const rawNames = text.split('\n').map((s) => s.trim()).filter(Boolean)
@@ -96,6 +102,21 @@ export function ImportDialog({ open, onOpenChange }: ImportDialogProps) {
           </DialogDescription>
         </DialogHeader>
 
+        {noCreds ? (
+          <div className="space-y-3 py-2">
+            <div className="flex items-start gap-3 rounded-md border border-amber-500/40 bg-amber-500/10 p-3">
+              <KeyRound className="h-5 w-5 shrink-0 text-amber-600 dark:text-amber-500" />
+              <div className="text-sm">
+                <p className="font-medium text-amber-700 dark:text-amber-400">
+                  尚未設定 YCUT 帳號，無法下單抓取
+                </p>
+                <p className="mt-1 text-muted-foreground">
+                  您的店還沒有設定永慶（YCUT）登入帳號。請先新增帳號與密碼，設定完成後即可送出爬取。
+                </p>
+              </div>
+            </div>
+          </div>
+        ) : (
         <div className="space-y-3 py-2">
           <Textarea
             value={text}
@@ -129,14 +150,28 @@ export function ImportDialog({ open, onOpenChange }: ImportDialogProps) {
             </div>
           )}
         </div>
+        )}
 
         <DialogFooter>
-          <Button variant="outline" onClick={handleClose} disabled={submitting}>
-            {submitting ? '送出中…' : '關閉'}
-          </Button>
-          <Button onClick={handleSubmit} disabled={submitting || validCount === 0}>
-            {submitting ? '送出中…' : `送出${validCount > 0 ? ` ${validCount} 個社區` : ''}`}
-          </Button>
+          {noCreds ? (
+            <>
+              <Button variant="outline" onClick={handleClose}>
+                關閉
+              </Button>
+              <Button onClick={() => { handleClose(); router.push('/admin/store-credentials') }}>
+                前往設定 YCUT 帳號
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button variant="outline" onClick={handleClose} disabled={submitting}>
+                {submitting ? '送出中…' : '關閉'}
+              </Button>
+              <Button onClick={handleSubmit} disabled={submitting || validCount === 0}>
+                {submitting ? '送出中…' : `送出${validCount > 0 ? ` ${validCount} 個社區` : ''}`}
+              </Button>
+            </>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>

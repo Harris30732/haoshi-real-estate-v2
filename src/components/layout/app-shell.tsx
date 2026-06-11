@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils'
 import { Sidebar } from './sidebar'
 import { Header } from './header'
 import { AuthGuard } from './auth-guard'
+import { YcutCredentialGate } from './ycut-credential-gate'
 import { Sheet, SheetContent } from '@/components/ui/sheet'
 import type { Role } from '@/types/user'
 
@@ -35,6 +36,7 @@ export function AppShell({ children, title, requiredRole, requiredPermission }: 
 
   return (
     <AuthGuard requiredRole={requiredRole} requiredPermission={requiredPermission}>
+    <YcutCredentialGate />
     <div className="min-h-screen bg-background">
       {/* Desktop sidebar */}
       <div className="hidden md:block">
