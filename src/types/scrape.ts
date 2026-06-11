@@ -77,7 +77,14 @@ export interface ScrapeRequestWithRun extends ScrapeRequest {
 /** 店 YCUT 憑證設定狀態（get_store_credential_status RPC 回傳；不含密文）。 */
 export interface StoreCredentialStatus {
   configured: boolean
+  /** 帳密異常（worker 驗證失敗或抓取途中被 YCUT 拒）；該店派工暫停，須重設帳密 */
   needs_refresh: boolean
+  /** 存檔後待 worker 跑 ycutLogin 驗證；驗證中該店派工暫停 */
+  pending_validation: boolean
+  /** 最近一次驗證失敗原因（needs_refresh=true 時顯示給店長） */
+  validation_error: string | null
+  /** 最近一次驗證通過時間 */
+  validated_at: string | null
   ycut_username: string | null
   rotated_at: string | null
 }

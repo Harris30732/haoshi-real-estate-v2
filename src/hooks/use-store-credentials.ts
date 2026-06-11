@@ -23,6 +23,9 @@ export function useStoreCredentialStatus(storeId: string | null) {
     },
     enabled: !!storeId,
     staleTime: 30_000,
+    // 驗證中每 5 秒輪詢，worker 驗完（通過/失敗）UI 自動更新三態
+    refetchInterval: (query) =>
+      query.state.data?.pending_validation ? 5_000 : false,
   })
 }
 
@@ -50,15 +53,21 @@ export function useSetStoreCredentials() {
 }
 
 /**
- * 當前登入店長的店是否「尚未設定 YCUT 帳密」。
+ * 當前登入店長的店是否「YCUT 帳密不可用」（未設定或帳密異常）。
  * 用於：(1) 全站提示彈窗 [[ycut-credential-gate]]、(2) 擋下單。
  * 只針對店長（manager）—— Owner 走多店下拉設定、員工不設帳密，故不觸發。
- * needs 僅在 RPC 明確回 configured=false 時為 true（loading/未知時不誤擋）。
+ * needs 僅在 RPC 明確回報時為 true（loading/未知時不誤擋）。
+ * reason 區分彈窗文案：'unconfigured'（從未設定）/ 'invalid'（驗證失敗，須重設）。
+ * 注意：pending_validation（驗證中）不觸發彈窗 —— worker 約 30 秒內就會驗完。
  */
 export function useNeedsYcutCredentials() {
   const profile = useAuth((s) => s.profile)
   const storeId = profile?.role_key === 'manager' ? (profile?.store_id ?? null) : null
   const status = useStoreCredentialStatus(storeId)
-  const needs = !!storeId && status.data != null && !status.data.configured
-  return { needs, isLoading: status.isLoading, storeId }
+  const reason: 'unconfigured' | 'invalid' | null =
+    !storeId || status.data == null ? null
+    : !status.data.configured ? 'unconfigured'
+    : status.data.needs_refresh ? 'invalid'
+    : null
+  return { needs: reason != null, reason, isLoading: status.isLoading, storeId }
 }

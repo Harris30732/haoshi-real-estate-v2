@@ -53,8 +53,8 @@ export function ImportDialog({ open, onOpenChange }: ImportDialogProps) {
   const submit = useScrapeSubmit()
   const qc = useQueryClient()
   const router = useRouter()
-  // 沒設定 YCUT 帳密就擋下單（避免又產生一堆憑證失敗的 run）。
-  const { needs: noCreds } = useNeedsYcutCredentials()
+  // YCUT 帳密不可用（未設定或驗證失敗）就擋下單（避免又產生一堆憑證失敗的 run）。
+  const { needs: noCreds, reason: credReason } = useNeedsYcutCredentials()
 
   const handleSubmit = async () => {
     const rawNames = text.split('\n').map((s) => s.trim()).filter(Boolean)
@@ -108,10 +108,14 @@ export function ImportDialog({ open, onOpenChange }: ImportDialogProps) {
               <KeyRound className="h-5 w-5 shrink-0 text-amber-600 dark:text-amber-500" />
               <div className="text-sm">
                 <p className="font-medium text-amber-700 dark:text-amber-400">
-                  尚未設定 YCUT 帳號，無法下單抓取
+                  {credReason === 'invalid'
+                    ? 'YCUT 帳密異常，抓取已暫停'
+                    : '尚未設定 YCUT 帳號，無法下單抓取'}
                 </p>
                 <p className="mt-1 text-muted-foreground">
-                  您的店還沒有設定永慶（YCUT）登入帳號。請先新增帳號與密碼，設定完成後即可送出爬取。
+                  {credReason === 'invalid'
+                    ? '您的店的永慶（YCUT）帳號登入驗證失敗。請重新設定正確帳密，驗證通過後即可繼續下單。'
+                    : '您的店還沒有設定永慶（YCUT）登入帳號。請先新增帳號與密碼，設定完成後即可送出爬取。'}
                 </p>
               </div>
             </div>

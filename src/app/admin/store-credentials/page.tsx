@@ -23,11 +23,12 @@ import {
 import { PERMISSIONS } from '@/lib/constants'
 import type { StoreCredentialStatus } from '@/types/scrape'
 
-/** 憑證狀態 badge。 */
+/** 憑證狀態 badge：未設定 / 驗證中 / 帳密異常 / 已驗證（/ 已設定 fallback）。 */
 function StatusBadge({ status }: { status: StoreCredentialStatus | null }) {
   if (!status || !status.configured) return <Badge variant="outline">未設定</Badge>
-  if (status.needs_refresh)
-    return <Badge variant="destructive">須更新（店長已變更）</Badge>
+  if (status.pending_validation) return <Badge variant="secondary">驗證中…</Badge>
+  if (status.needs_refresh) return <Badge variant="destructive">帳密異常</Badge>
+  if (status.validated_at) return <Badge variant="default">已驗證</Badge>
   return <Badge variant="secondary">已設定</Badge>
 }
 
@@ -105,6 +106,19 @@ export default function StoreCredentialsPage() {
                   目前帳號：{status.data.ycut_username ?? '—'}
                   {status.data.rotated_at &&
                     `；更新於 ${new Date(status.data.rotated_at).toLocaleString('zh-TW')}`}
+                  {status.data.validated_at &&
+                    `；驗證通過於 ${new Date(status.data.validated_at).toLocaleString('zh-TW')}`}
+                </p>
+              )}
+              {status.data?.pending_validation && (
+                <p className="text-xs text-muted-foreground">
+                  系統正在以此帳密測試 YCUT 登入（約 30 秒～1 分鐘），驗證通過後會自動恢復謄本抓取。
+                </p>
+              )}
+              {status.data?.needs_refresh && (
+                <p className="text-xs text-destructive">
+                  此帳密驗證失敗，該店謄本抓取已暫停；請重新輸入正確帳密。
+                  {status.data.validation_error && `原因：${status.data.validation_error}`}
                 </p>
               )}
               <div className="space-y-1.5">
