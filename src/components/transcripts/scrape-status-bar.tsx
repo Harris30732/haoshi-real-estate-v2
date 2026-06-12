@@ -1,6 +1,7 @@
 'use client'
 
-import { Loader2, AlertTriangle, Eye } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Loader2, AlertTriangle, Eye, ChevronDown, ChevronUp } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { useScrapeRequests } from '@/hooks/use-scrape-requests'
@@ -156,32 +157,66 @@ export function ScrapeStatusBar() {
   // 非 Owner（店長/員工）：只看自家「查無社區」失敗，提示重新確認名稱後重送。
   const notFound = isOwner ? [] : requests.filter(isRecentNotFound)
 
+  // 可收闔：預設收起只留一行摘要，點擊展開；偏好記在 localStorage。
+  const [open, setOpen] = useState(false)
+  useEffect(() => {
+    setOpen(localStorage.getItem('scrape-status-open') === '1')
+  }, [])
+  const toggleOpen = () => {
+    setOpen((v) => {
+      localStorage.setItem('scrape-status-open', v ? '0' : '1')
+      return !v
+    })
+  }
+
   if (isLoading) return null
   if (active.length === 0 && anomalies.length === 0 && notFound.length === 0) return null
+
+  const attentionCount = anomalies.length + notFound.length
 
   return (
     <Card className="border-primary/30 bg-primary/5">
       <CardContent className="py-3 px-4 space-y-3">
-        {active.length > 0 && (
-          <>
-            <div className="flex items-center gap-2 text-sm font-medium">
+        {/* 摘要列（永遠顯示，整列可點擊收闔） */}
+        <button
+          type="button"
+          onClick={toggleOpen}
+          className="flex w-full items-center gap-2 text-sm font-medium"
+          aria-expanded={open}
+        >
+          {active.length > 0 && (
+            <span className="flex items-center gap-2">
               <Loader2 className="h-4 w-4 animate-spin text-primary" />
               <span>正在抓取 ({active.length})</span>
-            </div>
-            <div className="space-y-2.5">
-              {active.map((req) => (
-                <ActiveRow
-                  key={req.id}
-                  req={req}
-                  progress={req.run_id ? progressMap?.[req.run_id] : undefined}
-                  isOwner={isOwner}
-                />
-              ))}
-            </div>
-          </>
+            </span>
+          )}
+          {attentionCount > 0 && (
+            <span className="flex items-center gap-1.5 text-amber-600 dark:text-amber-500">
+              <AlertTriangle className="h-4 w-4" />
+              <span>需要注意 ({attentionCount})</span>
+            </span>
+          )}
+          <span className="flex-1" />
+          <span className="flex items-center gap-1 text-xs font-normal text-muted-foreground">
+            {open ? '收合' : '展開'}
+            {open ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+          </span>
+        </button>
+
+        {open && active.length > 0 && (
+          <div className="space-y-2.5">
+            {active.map((req) => (
+              <ActiveRow
+                key={req.id}
+                req={req}
+                progress={req.run_id ? progressMap?.[req.run_id] : undefined}
+                isOwner={isOwner}
+              />
+            ))}
+          </div>
         )}
 
-        {anomalies.length > 0 && (
+        {open && anomalies.length > 0 && (
           <div className={active.length > 0 ? 'pt-2 border-t border-primary/20' : ''}>
             <div className="flex items-center gap-2 text-sm font-medium text-amber-600 dark:text-amber-500">
               <AlertTriangle className="h-4 w-4" />
@@ -227,7 +262,7 @@ export function ScrapeStatusBar() {
           </div>
         )}
 
-        {notFound.length > 0 && (
+        {open && notFound.length > 0 && (
           <div className={active.length > 0 ? 'pt-2 border-t border-primary/20' : ''}>
             <div className="flex items-center gap-2 text-sm font-medium text-amber-600 dark:text-amber-500">
               <AlertTriangle className="h-4 w-4" />
