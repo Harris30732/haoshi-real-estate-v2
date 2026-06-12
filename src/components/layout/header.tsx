@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { useTheme } from '@/hooks/use-theme'
 import { useAuth } from '@/hooks/use-auth'
+import { useMyStore } from '@/hooks/use-stores'
 import { useRouter } from 'next/navigation'
 import { ROLE_LABELS } from '@/lib/constants'
 
@@ -23,7 +24,13 @@ interface HeaderProps {
 export function Header({ onMenuClick, title }: HeaderProps) {
   const { theme, toggleTheme } = useTheme()
   const { profile, signOut } = useAuth()
+  const myStore = useMyStore()
   const router = useRouter()
+
+  // 「店名 · 角色」識別字串；未綁店（如 Owner）只顯示角色。
+  const identityLine = [myStore.data?.name, ROLE_LABELS[profile?.role_key ?? 'employee']]
+    .filter(Boolean)
+    .join(' · ')
 
   const handleLogout = async () => {
     await signOut()
@@ -63,6 +70,12 @@ export function Header({ onMenuClick, title }: HeaderProps) {
           <Bell className="h-4 w-4" />
         </Button>
 
+        {/* 登入身分：哪家店的誰（純顯示、不可點，手機收進頭像選單） */}
+        <div className="hidden select-none text-right leading-tight sm:block">
+          <p className="text-sm font-medium">{profile?.full_name || '使用者'}</p>
+          <p className="text-xs text-muted-foreground">{identityLine}</p>
+        </div>
+
         {/* User Menu */}
         <DropdownMenu>
           <DropdownMenuTrigger
@@ -75,7 +88,8 @@ export function Header({ onMenuClick, title }: HeaderProps) {
           <DropdownMenuContent className="w-56" align="end">
             <div className="px-2 py-1.5">
               <p className="text-sm font-medium">{profile?.full_name || '使用者'}</p>
-              <p className="text-xs text-muted-foreground">{profile?.email} · {ROLE_LABELS[profile?.role_key ?? 'employee']}</p>
+              <p className="text-xs text-muted-foreground">{identityLine}</p>
+              <p className="text-xs text-muted-foreground">{profile?.email}</p>
             </div>
             <DropdownMenuSeparator />
             <DropdownMenuItem>個人設定</DropdownMenuItem>

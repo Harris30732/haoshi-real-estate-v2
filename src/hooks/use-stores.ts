@@ -2,6 +2,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
+import { useAuth } from '@/hooks/use-auth'
 import type { Store } from '@/types/user'
 import toast from 'react-hot-toast'
 
@@ -31,6 +32,26 @@ export function useStores() {
       return (data ?? []) as Store[]
     },
     staleTime: 60_000,
+  })
+}
+
+/** 當前登入者所屬店（RLS：成員可讀自店）。未綁店（如部分 Owner）回 null。 */
+export function useMyStore() {
+  const profile = useAuth((s) => s.profile)
+  const storeId = profile?.store_id ?? null
+  return useQuery({
+    queryKey: ['my-store', storeId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('stores')
+        .select('id, name, code')
+        .eq('id', storeId as string)
+        .maybeSingle()
+      if (error) throw error
+      return (data ?? null) as Pick<Store, 'id' | 'name' | 'code'> | null
+    },
+    enabled: !!storeId,
+    staleTime: 300_000,
   })
 }
 
