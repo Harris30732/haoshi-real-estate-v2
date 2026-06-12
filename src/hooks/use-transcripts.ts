@@ -43,16 +43,15 @@ function flattenCommunity(rows: RawTranscriptRow[]): Transcript[] {
   }) as Transcript)
 }
 
+// PostgREST 單次回應上限 1000 列 → 必須用 range 分頁把全量撈完，
+// 否則大社區（潤隆 824 戶）或全社區檢視會被靜默截斷。
+const PAGE_SIZE = 1000
+
 export function useTranscripts(communityName?: string) {
   return useQuery({
     queryKey: ['transcripts', communityName],
     queryFn: async () => {
-      let query = supabase
-        .from('transcripts')
-        .select('*, community:communities(name, address, builder, completion_date, building_floors, total_units, units_per_floor, ping_range, layout_plan, building_type, management_type, main_structure)')
-        .order('community_id', { ascending: true })
-        .order('ycut_object_key', { ascending: true })
-
+      let communityId: string | null = null
       if (communityName) {
         // 先查 community_id by name（avoid filter on joined column）
         const { data: c, error: cErr } = await supabase
@@ -61,13 +60,25 @@ export function useTranscripts(communityName?: string) {
           .eq('name', communityName)
           .single()
         if (cErr || !c) return []
-        query = query.eq('community_id', c.id)
+        communityId = c.id
       }
 
-      query = query.limit(500)
-      const { data, error } = await query
-      if (error) throw error
-      return flattenCommunity((data || []) as unknown as RawTranscriptRow[])
+      const all: RawTranscriptRow[] = []
+      for (let from = 0; ; from += PAGE_SIZE) {
+        let query = supabase
+          .from('transcripts')
+          .select('*, community:communities(name, address, builder, completion_date, building_floors, total_units, units_per_floor, ping_range, layout_plan, building_type, management_type, main_structure)')
+          .order('community_id', { ascending: true })
+          .order('ycut_object_key', { ascending: true })
+          .range(from, from + PAGE_SIZE - 1)
+        if (communityId) query = query.eq('community_id', communityId)
+        const { data, error } = await query
+        if (error) throw error
+        const rows = (data || []) as unknown as RawTranscriptRow[]
+        all.push(...rows)
+        if (rows.length < PAGE_SIZE) break
+      }
+      return flattenCommunity(all)
     },
     staleTime: 120_000,
   })
@@ -77,36 +88,17 @@ export function useTranscriptStats() {
   return useQuery({
     queryKey: ['transcript-stats'],
     queryFn: async () => {
-      // 1. 全部 transcripts 的 community_id
-      const { data: trData, error: trErr } = await supabase
-        .from('transcripts')
-        .select('community_id')
-      if (trErr) throw trErr
-
-      const rows = trData || []
-      const idMap: Record<string, number> = {}
-      rows.forEach((r) => {
-        const id = r.community_id as string
-        if (id) idMap[id] = (idMap[id] || 0) + 1
-      })
-
-      // 2. 取對應 communities 的 name
-      const ids = Object.keys(idMap)
-      let communities: { name: string; count: number }[] = []
-      if (ids.length > 0) {
-        const { data: cs, error: cErr } = await supabase
-          .from('communities')
-          .select('id, name')
-          .in('id', ids)
-        if (cErr) throw cErr
-        communities = (cs || []).map((c) => ({
-          name: c.name as string,
-          count: idMap[c.id as string] || 0,
-        })).sort((a, b) => b.count - a.count)
-      }
-
+      // server 端聚合（SECURITY INVOKER，照 RLS 各看各的）；
+      // 原本前端撈全表 community_id 數行會被 PostgREST 1000 列上限截斷。
+      const { data, error } = await supabase.rpc('transcript_stats')
+      if (error) throw error
+      const rows = (data ?? []) as { community_name: string; transcript_count: number }[]
+      const communities = rows.map((r) => ({
+        name: r.community_name,
+        count: Number(r.transcript_count),
+      }))
       return {
-        total: rows.length,
+        total: communities.reduce((s, c) => s + c.count, 0),
         communities,
       }
     },
