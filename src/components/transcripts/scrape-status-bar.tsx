@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Loader2, AlertTriangle, Eye, ChevronDown, ChevronUp } from 'lucide-react'
+import { Loader2, AlertTriangle, Eye, ChevronDown, ChevronUp, Copy, Check } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { useScrapeRequests } from '@/hooks/use-scrape-requests'
@@ -53,6 +53,45 @@ function relativeTime(iso: string): string {
   const hr = Math.floor(min / 60)
   if (hr < 24) return `${hr} 小時前`
   return `${Math.floor(hr / 24)} 天前`
+}
+
+/** 單一相似社區名 chip：點一下複製到剪貼簿（貼回上方批次下單重送），顯示「已複製」回饋。 */
+function CopyChip({ name }: { name: string }) {
+  const [copied, setCopied] = useState(false)
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(name)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    } catch {
+      // clipboard 不可用（非 https / 權限被拒）→ 靜默，不影響候選顯示
+    }
+  }
+  return (
+    <button
+      type="button"
+      onClick={handleCopy}
+      title="複製此社區名，貼回批次下單重新送出"
+      className="inline-flex items-center gap-1 rounded-full border border-primary/40 bg-background px-2 py-0.5 text-xs font-medium text-primary transition-colors hover:bg-primary/10"
+    >
+      {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+      <span>{name}</span>
+      <span className="text-[10px] text-muted-foreground">{copied ? '已複製' : '複製'}</span>
+    </button>
+  )
+}
+
+/** 相似社區名候選列：提示文字 + 每個名稱一顆可複製 chip。names 為空時不渲染。 */
+function SimilarCandidates({ names }: { names: string[] | null | undefined }) {
+  if (!names || names.length === 0) return null
+  return (
+    <div className="mt-1 flex flex-wrap items-center gap-1.5">
+      <span className="text-xs text-muted-foreground">你是不是要找：</span>
+      {names.map((name) => (
+        <CopyChip key={name} name={name} />
+      ))}
+    </div>
+  )
 }
 
 type Phase = 'queued' | 'scanning' | 'scraping'
@@ -247,6 +286,7 @@ export function ScrapeStatusBar() {
                         {req.run.fail_reason}
                       </div>
                     )}
+                    <SimilarCandidates names={req.run?.similar_candidates} />
                     {req.run?.displayed_count != null && req.run?.covered_count != null && (
                       <div className="text-xs text-muted-foreground">
                         已收錄 {req.run.covered_count} / {req.run.displayed_count} 戶
@@ -282,8 +322,11 @@ export function ScrapeStatusBar() {
                       </Badge>
                     </div>
                     <div className="text-xs text-muted-foreground">
-                      永慶盤面查無此社區，請確認名稱正確後重新下單
+                      {req.run?.similar_candidates && req.run.similar_candidates.length > 0
+                        ? '永慶盤面查無此社區名，可從下列相似社區複製正確名稱後重新下單'
+                        : '永慶盤面查無此社區，請確認名稱正確後重新下單'}
                     </div>
+                    <SimilarCandidates names={req.run?.similar_candidates} />
                   </div>
                   <span className="text-xs text-muted-foreground shrink-0">
                     {relativeTime(req.run?.finished_at ?? req.run?.updated_at ?? req.created_at)}

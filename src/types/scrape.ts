@@ -49,6 +49,12 @@ export interface ScrapeRun {
   claimed_at: string | null
   data_snapshot_at: string | null
   fail_reason: string | null
+  /**
+   * 「查無社區（無完全相符）」時，YCUT 盤面搜到的相似社區名，原樣呈現（與後台一致：
+   * 不切別名、不放寬比對）。供前端渲染成可複製候選，使用者貼回重送仍須完全一致才會抓；
+   * 其餘失敗型態為 null。
+   */
+  similar_candidates: string[] | null
   started_at: string | null
   finished_at: string | null
   created_at: string
