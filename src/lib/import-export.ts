@@ -1,6 +1,9 @@
 import { Property } from '@/types/property'
 import type { Transcript } from '@/types/transcript'
 import { exportDoor } from '@/lib/transcript-format'
+import { formatTaiwanTime } from '@/lib/utils'
+import { SCRAPE_RUN_STATUS_LABELS } from '@/lib/constants'
+import type { ScrapeRunLogRow } from '@/hooks/use-scrape-dashboard'
 
 // ==================== Export ====================
 
@@ -155,6 +158,64 @@ export async function exportTranscriptsXlsx(
   a.href = url
   const baseName = sheetName === '謄本' ? '謄本資料' : sheetName
   a.download = filename || `${baseName}_客服名單_${formatDate()}.xlsx`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+// ==================== Scrape Runs → Excel ====================
+// 任務報表匯出：社區名、狀態、抓到戶數、總戶數、完成時間(台灣時間)、失敗原因
+
+export async function exportScrapeRunsXlsx(
+  runs: ScrapeRunLogRow[],
+  filename?: string,
+) {
+  if (!runs || runs.length === 0) {
+    throw new Error('沒有資料可以匯出')
+  }
+
+  const ExcelJS = (await import('exceljs')).default
+
+  const wb = new ExcelJS.Workbook()
+  wb.creator = '好市不動產'
+  wb.created = new Date()
+
+  const ws = wb.addWorksheet('爬取任務報表')
+  ws.columns = [
+    { header: '社區名稱', key: 'community_name', width: 24 },
+    { header: '狀態', key: 'status', width: 12 },
+    { header: '抓到戶數', key: 'covered', width: 10 },
+    { header: '總戶數', key: 'displayed', width: 10 },
+    { header: '完成時間', key: 'finished_at', width: 20 },
+    { header: '失敗原因', key: 'fail_reason', width: 40 },
+  ]
+  ws.getRow(1).font = { bold: true }
+  ws.getRow(1).alignment = { vertical: 'middle', horizontal: 'center' }
+  ws.getRow(1).fill = {
+    type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE3F2FD' },
+  }
+
+  for (const r of runs) {
+    ws.addRow({
+      community_name: r.community?.name || '',
+      status: SCRAPE_RUN_STATUS_LABELS[r.status] || r.status,
+      covered: r.covered_count ?? '',
+      displayed: r.displayed_count ?? '',
+      finished_at: formatTaiwanTime(r.finished_at ?? r.updated_at),
+      fail_reason: r.fail_reason || '',
+    })
+  }
+
+  ws.views = [{ state: 'frozen', ySplit: 1 }]
+  ws.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: 6 } }
+
+  const buf = await wb.xlsx.writeBuffer()
+  const blob = new Blob([buf], {
+    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename || `爬取任務報表_${formatDate()}.xlsx`
   a.click()
   URL.revokeObjectURL(url)
 }

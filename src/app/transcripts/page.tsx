@@ -16,11 +16,15 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
 import { useTranscripts, useTranscriptStats } from '@/hooks/use-transcripts'
 import { useMyPermissions } from '@/hooks/use-permissions'
-import { exportTranscriptsXlsx } from '@/lib/import-export'
+import { useAuth } from '@/hooks/use-auth'
+import { useAllScrapeRunsForExport } from '@/hooks/use-scrape-dashboard'
+import { exportTranscriptsXlsx, exportScrapeRunsXlsx } from '@/lib/import-export'
 import { formatDoor } from '@/lib/transcript-format'
 import { PERMISSIONS } from '@/lib/constants'
 import { ImportDialog } from '@/components/transcripts/import-dialog'
 import { ScrapeStatusBar } from '@/components/transcripts/scrape-status-bar'
+import { ScrapeSummaryCards } from '@/components/transcripts/scrape-summary-cards'
+import { ScrapeRunLog } from '@/components/transcripts/scrape-run-log'
 
 function InfoField({ label, value }: { label: string; value: string }) {
   return (
@@ -56,6 +60,9 @@ export default function TranscriptsPage() {
 
   const permissions = useMyPermissions()
   const canSubmitScrape = permissions.has(PERMISSIONS.SCRAPE_SUBMIT)
+  // 爬取總覽儀表板僅系統擁有者可見（同 ScrapeStatusBar 的 owner 判定：role_key === 'owner'）。
+  // role_key 為同步取得（Zustand selector），非 owner 直接不渲染，不會閃現。
+  const isOwner = useAuth((s) => s.profile?.role_key) === 'owner'
 
   const { data: stats, isLoading: statsLoading } = useTranscriptStats()
   const { data: transcripts, isLoading: dataLoading } = useTranscripts(selectedCommunity)
@@ -127,11 +134,42 @@ export default function TranscriptsPage() {
     }
   }
 
+  // 匯出任務報表：點擊時才拉全部 runs（enabled:false，用 refetch 觸發），上限 1000。
+  const [exportingRuns, setExportingRuns] = useState(false)
+  const { refetch: refetchRunsForExport } = useAllScrapeRunsForExport(
+    { status: 'all', search: '' },
+    false,
+  )
+  const handleExportRuns = async () => {
+    setExportingRuns(true)
+    try {
+      const { data: runs } = await refetchRunsForExport()
+      if (!runs || runs.length === 0) {
+        toast.error('沒有任務紀錄可以匯出')
+        return
+      }
+      await exportScrapeRunsXlsx(runs)
+      toast.success(`已匯出 ${runs.length} 筆任務報表`)
+    } catch (err) {
+      console.error(err)
+      toast.error('匯出失敗：' + (err instanceof Error ? err.message : '未知錯誤'))
+    } finally {
+      setExportingRuns(false)
+    }
+  }
+
   return (
     <AppShell title="謄本資料">
       <Suspense fallback={null}>
         <ActionParamHandler onImport={() => setImportOpen(true)} />
       </Suspense>
+
+      {/* 總覽卡片列（第一層）：社區涵蓋 / 任務結果 / 匯入請求 / 失敗原因（僅 owner） */}
+      {isOwner && (
+        <div className="mb-4">
+          <ScrapeSummaryCards />
+        </div>
+      )}
 
       {/* 狀態欄：active scrapes（0 自動隱藏）*/}
       <div className="mb-4">
@@ -207,6 +245,12 @@ export default function TranscriptsPage() {
                       <Button variant="outline" size="sm" onClick={() => setImportOpen(true)}>
                         <Plus className="h-4 w-4 mr-2" />
                         匯入社區
+                      </Button>
+                    )}
+                    {isOwner && (
+                      <Button variant="outline" size="sm" onClick={handleExportRuns} disabled={exportingRuns}>
+                        {exportingRuns ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
+                        匯出任務報表
                       </Button>
                     )}
                     <Button variant="default" size="sm" onClick={handleExport} disabled={exporting}>
@@ -289,6 +333,16 @@ export default function TranscriptsPage() {
                     <Button variant="outline" size="sm" onClick={() => setImportOpen(true)}>
                       <Plus className="h-4 w-4 mr-2" />
                       匯入社區
+                    </Button>
+                  )}
+                  {isOwner && (
+                    <Button variant="outline" size="sm" onClick={handleExportRuns} disabled={exportingRuns}>
+                      {exportingRuns ? (
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      ) : (
+                        <Download className="h-4 w-4 mr-2" />
+                      )}
+                      匯出任務報表
                     </Button>
                   )}
                   <Button
@@ -392,6 +446,14 @@ export default function TranscriptsPage() {
           )}
         </div>
       </div>
+
+      {/* 任務紀錄表（第二層）：全社區爬取任務歷史，可篩選/搜尋/分頁（僅 owner） */}
+      {isOwner && (
+        <div className="mt-8 space-y-3">
+          <h2 className="text-sm font-semibold">爬取任務紀錄</h2>
+          <ScrapeRunLog />
+        </div>
+      )}
 
       <ImportDialog open={importOpen} onOpenChange={setImportOpen} />
     </AppShell>
