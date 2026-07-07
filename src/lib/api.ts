@@ -1,18 +1,11 @@
 import { API_BASE, ENDPOINTS } from './constants'
 import { Property, PropertyFormData } from '@/types/property'
 import { Community } from '@/types/community'
-import { User } from '@/types/user'
-import { AUTH_CONFIG } from './auth-config'
+import { useAuth } from '@/hooks/use-auth'
 
+/** n8n webhook 呼叫的操作者標記（稽核用），取自目前登入者。 */
 function getUser(): string {
-  try {
-    const stored = localStorage.getItem(AUTH_CONFIG.STORAGE_KEYS.USER)
-    if (stored) {
-      const user = JSON.parse(stored)
-      return user.name || 'unknown'
-    }
-  } catch { /* ignore */ }
-  return 'unknown'
+  return useAuth.getState().profile?.full_name ?? 'unknown'
 }
 
 async function apiPost(endpoint: string, body: Record<string, unknown>) {
@@ -30,7 +23,6 @@ async function apiPost(endpoint: string, body: Record<string, unknown>) {
 export async function fetchAllData(): Promise<{
   properties: Property[]
   communities: Community[]
-  users: User[]
 }> {
   const res = await fetch(`${API_BASE}${ENDPOINTS.ALL_DATA}`)
   if (!res.ok) throw new Error(`Fetch failed: ${res.status}`)
@@ -41,9 +33,8 @@ export async function fetchAllData(): Promise<{
     ? data.properties_for_sale
     : Array.isArray(data.properties) ? data.properties : []
   const communities = Array.isArray(data.communities) ? data.communities : []
-  const users = Array.isArray(data.users) ? data.users : []
 
-  return { properties, communities, users }
+  return { properties, communities }
 }
 
 // ==================== Property CRUD ====================
@@ -94,33 +85,6 @@ export async function updateCommunity(id: string, data: Partial<Community>) {
 
 export async function deleteCommunity(id: string) {
   return apiPost(ENDPOINTS.COMMUNITIES, {
-    action: 'delete',
-    user: getUser(),
-    id,
-  })
-}
-
-// ==================== User CRUD ====================
-
-export async function createUser(data: Partial<User>) {
-  return apiPost(ENDPOINTS.USERS, {
-    action: 'create',
-    user: getUser(),
-    data,
-  })
-}
-
-export async function updateUser(id: string, data: Partial<User>) {
-  return apiPost(ENDPOINTS.USERS, {
-    action: 'update',
-    user: getUser(),
-    id,
-    data,
-  })
-}
-
-export async function deleteUser(id: string) {
-  return apiPost(ENDPOINTS.USERS, {
     action: 'delete',
     user: getUser(),
     id,

@@ -5,14 +5,20 @@ import { cn } from '@/lib/utils'
 import { Sidebar } from './sidebar'
 import { Header } from './header'
 import { AuthGuard } from './auth-guard'
+import { YcutCredentialGate } from './ycut-credential-gate'
 import { Sheet, SheetContent } from '@/components/ui/sheet'
+import type { Role } from '@/types/user'
 
 interface AppShellProps {
   children: React.ReactNode
   title?: string
+  /** 頁面最低角色門檻，透傳給 AuthGuard 做 gating。 */
+  requiredRole?: Role
+  /** 頁面最低功能權限門檻，透傳給 AuthGuard 做 gating。 */
+  requiredPermission?: string
 }
 
-export function AppShell({ children, title }: AppShellProps) {
+export function AppShell({ children, title, requiredRole, requiredPermission }: AppShellProps) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
 
@@ -29,7 +35,8 @@ export function AppShell({ children, title }: AppShellProps) {
   }, [])
 
   return (
-    <AuthGuard>
+    <AuthGuard requiredRole={requiredRole} requiredPermission={requiredPermission}>
+    <YcutCredentialGate />
     <div className="min-h-screen bg-background">
       {/* Desktop sidebar */}
       <div className="hidden md:block">

@@ -10,40 +10,97 @@ import {
   FileText,
   BarChart3,
   Users,
-  Settings,
+  Store,
+  KeyRound,
+  Receipt,
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
-import { APP_NAME } from '@/lib/constants'
+import { APP_NAME, PERMISSIONS } from '@/lib/constants'
+import { useAuth } from '@/hooks/use-auth'
+import { useMyPermissions } from '@/hooks/use-permissions'
 
 interface SidebarProps {
   collapsed: boolean
   onToggle: () => void
 }
 
-const mainNav = [
+interface NavItem {
+  href: string
+  label: string
+  icon: React.ComponentType<{ className?: string }>
+  /** 需具備此功能權限才顯示。 */
+  permission?: string
+  /** 僅 Owner 可見。 */
+  ownerOnly?: boolean
+  /** active 判定用精確比對（href 為其他項目的前綴時需設此旗標）。 */
+  exact?: boolean
+}
+
+const mainNav: NavItem[] = [
   { href: '/', label: '儀表板', icon: LayoutDashboard },
   { href: '/properties', label: '物件管理', icon: Home },
-  { href: '/communities', label: '社區管理', icon: Building2 },
-  { href: '/transcripts', label: '謄本資料', icon: FileText },
+  { href: '/communities', label: '社區管理', icon: Building2, permission: PERMISSIONS.COMMUNITIES_VIEW },
+  { href: '/transcripts', label: '謄本資料', icon: FileText, permission: PERMISSIONS.TRANSCRIPTS_VIEW },
   { href: '/analytics', label: '數據分析', icon: BarChart3 },
 ]
 
-const adminNav = [
-  { href: '/admin/users', label: '使用者管理', icon: Users },
-  { href: '/admin/settings', label: '系統設定', icon: Settings },
+const adminNav: NavItem[] = [
+  // 成員管理頁承載「邀請成員」（Email 預先邀請）；舊「待審核申請」自助註冊流程已停用。
+  { href: '/admin/members', label: '成員管理', icon: Users, permission: PERMISSIONS.STORE_MANAGE_MEMBERS },
+  { href: '/admin/store-credentials', label: 'YCUT 帳號設定', icon: KeyRound, permission: PERMISSIONS.STORE_MANAGE_CREDENTIALS },
+  { href: '/admin/stores', label: '店別管理', icon: Store, ownerOnly: true },
+  { href: '/admin/pricing', label: '計價帳務', icon: Receipt, ownerOnly: true },
 ]
 
 export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const pathname = usePathname()
+  const profile = useAuth((s) => s.profile)
+  const permissions = useMyPermissions()
+  const isOwner = profile?.role_key === 'owner'
+
+  // Owner 看全部；其餘依 ownerOnly / permission 過濾。
+  const canSee = (item: NavItem) => {
+    if (isOwner) return true
+    if (item.ownerOnly) return false
+    if (item.permission) return permissions.has(item.permission)
+    return true
+  }
+
+  const visibleMain = mainNav.filter(canSee)
+  const visibleAdmin = adminNav.filter(canSee)
+
+  const renderItem = (item: NavItem) => {
+    const isActive =
+      item.href === '/' || item.exact
+        ? pathname === item.href
+        : pathname.startsWith(item.href)
+    return (
+      <Link
+        key={item.href}
+        href={item.href}
+        className={cn(
+          'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+          isActive
+            ? 'bg-primary/10 text-primary'
+            : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
+          collapsed && 'justify-center px-2',
+        )}
+        title={collapsed ? item.label : undefined}
+      >
+        <item.icon className="h-4 w-4 shrink-0" />
+        {!collapsed && <span>{item.label}</span>}
+      </Link>
+    )
+  }
 
   return (
     <aside
       className={cn(
         'fixed left-0 top-0 z-40 h-screen border-r bg-card transition-all duration-300',
-        collapsed ? 'w-16' : 'w-60'
+        collapsed ? 'w-16' : 'w-60',
       )}
     >
       <div className="flex h-full flex-col">
@@ -54,61 +111,21 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
               好
             </div>
             {!collapsed && (
-              <span className="text-lg font-semibold tracking-tight">
-                {APP_NAME}
-              </span>
+              <span className="text-lg font-semibold tracking-tight">{APP_NAME}</span>
             )}
           </Link>
         </div>
 
-        {/* Main Nav */}
+        {/* Nav */}
         <nav className="flex-1 space-y-1 p-2">
-          {mainNav.map((item) => {
-            const isActive =
-              item.href === '/'
-                ? pathname === '/'
-                : pathname.startsWith(item.href)
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={cn(
-                  'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
-                  isActive
-                    ? 'bg-primary/10 text-primary'
-                    : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
-                  collapsed && 'justify-center px-2'
-                )}
-                title={collapsed ? item.label : undefined}
-              >
-                <item.icon className="h-4 w-4 shrink-0" />
-                {!collapsed && <span>{item.label}</span>}
-              </Link>
-            )
-          })}
+          {visibleMain.map(renderItem)}
 
-          <Separator className="my-2" />
-
-          {adminNav.map((item) => {
-            const isActive = pathname.startsWith(item.href)
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={cn(
-                  'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
-                  isActive
-                    ? 'bg-primary/10 text-primary'
-                    : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
-                  collapsed && 'justify-center px-2'
-                )}
-                title={collapsed ? item.label : undefined}
-              >
-                <item.icon className="h-4 w-4 shrink-0" />
-                {!collapsed && <span>{item.label}</span>}
-              </Link>
-            )
-          })}
+          {visibleAdmin.length > 0 && (
+            <>
+              <Separator className="my-2" />
+              {visibleAdmin.map(renderItem)}
+            </>
+          )}
         </nav>
 
         {/* Collapse Toggle */}
