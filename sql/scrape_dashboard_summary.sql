@@ -1,6 +1,8 @@
 -- 爬取任務總覽聚合 RPC：一次回一包 JSON 給 /transcripts 頁的 owner-only 總覽卡片列。
 -- 供 useScrapeDashboardSummary() 呼叫。SECURITY INVOKER：聚合結果依呼叫者 RLS 自動範圍化。
 -- 已於 2026-07-05 apply 至線上（Supabase project sglxyvexpdmdwfsuypvi）；此檔為版控留存。
+-- 2026-07-07: with_data 改從 transcripts 計算——原「有 passed run 的社區」會被誤標成功殘留
+-- 與已合併社區（輕井澤→竹城輕井澤）灌水（顯示 69、實際有資料 67），且與列表的 transcript_stats 口徑不一致。
 create or replace function public.scrape_dashboard_summary()
 returns json
 language sql
@@ -12,7 +14,8 @@ as $function$
   select json_build_object(
     'communities', json_build_object(
       'total',           (select count(*) from public.communities where merged_into_id is null),
-      'with_data',       (select count(distinct community_id) from public.scrape_runs where status = 'passed'),
+      'with_data',       (select count(distinct t.community_id) from public.transcripts t
+                          join public.communities c on c.id = t.community_id and c.merged_into_id is null),
       'attempted',       (select count(distinct community_id) from public.scrape_runs),
       'never_attempted', (select count(*) from public.communities c
                           where c.merged_into_id is null
