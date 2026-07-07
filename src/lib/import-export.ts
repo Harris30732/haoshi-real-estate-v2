@@ -47,6 +47,17 @@ export function exportAllDataJSON(data: { properties: Property[]; communities: u
 // 客服匯出：5 欄聯絡資料（社區名稱 / 社區地址 / 社區戶號 / 所有權人 / 所有權人地址）
 // 客服情境：用所有權人地址寄信、用所有權人姓名打招呼
 
+// Excel 工作表名稱不可含 * ? : \ / [ ]、頭尾不可為單引號（ExcelJS 都直接 throw），上限 31 字；
+// 社區名可能含「/」（如 中悅一品/中悅世界中心）→ 換成 - 再截長；淨化後為空則退回「謄本」。
+// 回歸測試：scripts/test-export-sheetname.js（npm run test:export）
+function safeSheetName(name: string): string {
+  const cleaned = name
+    .replace(/[*?:\\/[\]]/g, '-')
+    .substring(0, 31)
+    .replace(/^'+|'+$/g, '')
+  return cleaned || '謄本'
+}
+
 export async function exportTranscriptsXlsx(
   transcripts: Transcript[],
   filename?: string,
@@ -62,7 +73,7 @@ export async function exportTranscriptsXlsx(
   wb.creator = '好市不動產'
   wb.created = new Date()
 
-  const sheetName = (transcripts[0]?.community_name || '謄本').substring(0, 31)
+  const sheetName = safeSheetName(transcripts[0]?.community_name || '謄本')
 
   // ─── Sheet 1: 社區資料（每社區一行）────────────────────────────────
   // 從 transcripts 抽出 unique community 資訊（同社區所有 transcript 的 community_* 欄位相同）
